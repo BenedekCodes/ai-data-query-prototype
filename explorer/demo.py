@@ -2,6 +2,7 @@
 
 from contextlib import closing
 import sqlite3
+from collections.abc import Mapping
 
 
 EXAMPLE_QUERIES = {
@@ -41,10 +42,12 @@ SAMPLE_ORDERS = [
 ]
 
 
-def sql_for_question(question: str) -> str:
+def sql_for_question(
+    question: str, queries: Mapping[str, str] = EXAMPLE_QUERIES
+) -> str:
     """Return a predefined query, not an LLM-generated query."""
     normalized = " ".join(question.split()).casefold()
-    for example, sql in EXAMPLE_QUERIES.items():
+    for example, sql in queries.items():
         if normalized == example.casefold():
             return sql.strip()
     raise ValueError("Please enter one of the supported example questions exactly.")

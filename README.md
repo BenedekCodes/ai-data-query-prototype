@@ -12,9 +12,9 @@ example questions shown in the UI to predefined SQL and display the SQL,
 results and a chart. Matching ignores case and extra whitespace; other questions
 are not supported yet.
 
-**This is not yet an LLM integration.** Trino mode supports three questions;
-the daily revenue question is only available in the SQLite demo because the
-Trino sample table has no date column.
+**This is not yet an LLM integration.** Trino mode includes the original sample
+questions plus monthly revenue, top products and profit by region. The daily
+revenue question is only available in the SQLite demo.
 
 ## Project structure
 
@@ -64,16 +64,28 @@ printf 'STORAGE_ACCESS_KEY=%s\nSTORAGE_SECRET_KEY=%s\nPOLARIS_CLIENT_ID=%s\nPOLA
 ```
 
 The generated file is ignored by Git; do not share or commit it. Start the
-services and create a sample Iceberg table:
+services and create the sample Iceberg tables:
 
 ```sh
 docker compose -f infra/compose.yaml up -d --wait
 docker compose -f infra/compose.yaml exec -T trino trino < infra/sample.sql
+docker compose -f infra/compose.yaml exec -T trino trino < infra/retail.sql
 ```
 
-The last command prints revenue by region. Run it again without duplicating
-data, or open the Trino UI at http://localhost:8080 to explore the `iceberg`
-catalog. Polaris is available at http://localhost:8181.
+The first SQL script prints sample revenue by region. Both scripts can be run
+again without duplicating data; they create missing tables but do not replace
+existing ones. The retail dataset consists of 200 customers, 30 products, 2,000
+orders and 4,001 order items across 2024–2025. All data is synthetic.
+
+The retail analyses join these tables and exclude cancelled orders. Revenue
+is quantity × unit price after discount; profit is revenue minus item cost.
+The Trino UI is at http://localhost:8080 and Polaris is at http://localhost:8181.
+
+To run the additional integration tests against the seeded stack:
+
+```sh
+TRINO_INTEGRATION_TESTS=1 python -m unittest discover -s tests -p 'test_retail_integration.py'
+```
 
 **Data is disposable:** Polaris uses an in-memory catalog. Restarting services
 can lose the catalog. The following command stops the stack and deletes its
@@ -83,7 +95,7 @@ containers and storage volume, including all sample data:
 docker compose -f infra/compose.yaml down --volumes
 ```
 
-To start fresh, run the two startup commands again. The stack uses generated
+To start fresh, run the startup and SQL commands again. The stack uses generated
 local credentials, but exposes an unauthenticated Trino endpoint on localhost;
 do not use it for real data or expose it to a network.
 

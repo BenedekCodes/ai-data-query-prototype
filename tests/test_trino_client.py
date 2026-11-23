@@ -10,7 +10,7 @@ class TrinoClientTests(unittest.TestCase):
         self.assertIn("FROM iceberg.demo.orders", sql)
 
     def test_daily_question_is_not_available_for_trino(self):
-        with self.assertRaisesRegex(ValueError, "not supported"):
+        with self.assertRaisesRegex(ValueError, "supported example questions"):
             sql_for_trino_question("How does revenue change by day?")
 
     def test_arbitrary_sql_is_rejected_before_connection(self):

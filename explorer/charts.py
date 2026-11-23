@@ -13,6 +13,6 @@ def make_chart(results: pd.DataFrame) -> Figure | None:
 
     dimension = dimension_columns[0]
     measure = numeric_columns[0]
-    if dimension == "order_date":
+    if dimension in ("order_date", "month"):
         return px.line(results, x=dimension, y=measure, markers=True)
     return px.bar(results, x=dimension, y=measure)

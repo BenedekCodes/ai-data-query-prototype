@@ -16,6 +16,11 @@ class ChartTests(unittest.TestCase):
         self.assertIsNotNone(chart)
         self.assertEqual(chart.data[0].type, "scatter")
 
+    def test_monthly_result_uses_line_chart(self):
+        chart = make_chart(pd.DataFrame({"month": ["2024-01-01"], "revenue": [100]}))
+        self.assertIsNotNone(chart)
+        self.assertEqual(chart.data[0].type, "scatter")
+
     def test_unplottable_results_return_no_chart(self):
         self.assertIsNone(make_chart(pd.DataFrame({"revenue": [100]})))
         self.assertIsNone(make_chart(pd.DataFrame({"region": [], "revenue": []})))
