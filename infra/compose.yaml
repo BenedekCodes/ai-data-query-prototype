@@ -1,0 +1,78 @@
+services:
+  storage:
+    image: rustfs/rustfs:1.0.0-beta.8
+    environment:
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Set STORAGE_ACCESS_KEY in infra/.env}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:?Set STORAGE_SECRET_KEY in infra/.env}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: ":9000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://127.0.0.1:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  bucket:
+    image: amazon/aws-cli:2.39.6
+    depends_on:
+      storage:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY}
+      AWS_DEFAULT_REGION: us-west-2
+      AWS_ENDPOINT_URL: http://storage:9000
+    entrypoint: ["aws"]
+    command: ["s3", "mb", "s3://explorer"]
+
+  polaris:
+    image: apache/polaris:1.9.0
+    ports:
+      - "127.0.0.1:8181:8181"
+    depends_on:
+      bucket:
+        condition: service_completed_successfully
+    environment:
+      AWS_REGION: us-west-2
+      AWS_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY}
+      POLARIS_BOOTSTRAP_CREDENTIALS: POLARIS,${POLARIS_CLIENT_ID},${POLARIS_CLIENT_SECRET}
+      polaris.realm-context.realms: POLARIS
+      quarkus.otel.sdk.disabled: "true"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8182/q/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  catalog-setup:
+    image: python:3.13-alpine
+    depends_on:
+      polaris:
+        condition: service_healthy
+    environment:
+      POLARIS_CLIENT_ID: ${POLARIS_CLIENT_ID}
+      POLARIS_CLIENT_SECRET: ${POLARIS_CLIENT_SECRET}
+    volumes:
+      - ./setup_catalog.py:/setup_catalog.py:ro
+    command: ["python", "/setup_catalog.py"]
+
+  trino:
+    image: trinodb/trino:480
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      catalog-setup:
+        condition: service_completed_successfully
+    environment:
+      POLARIS_CLIENT_ID: ${POLARIS_CLIENT_ID}
+      POLARIS_CLIENT_SECRET: ${POLARIS_CLIENT_SECRET}
+    volumes:
+      - ./trino/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/v1/info"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
